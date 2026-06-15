@@ -80,3 +80,49 @@ def test_qa_gate_fails_short_script():
     valid, issues = gate.validate_content(pkg)
     assert not valid
     assert any("short" in i for i in issues)
+
+
+import json as _json
+from datetime import datetime, timezone
+from yt_automator.pipeline.run_logger import RunLogger
+from yt_automator.models import (
+    ContentPackage, MediaAsset, RenderResult, UploadResult, PublishRecord
+)
+
+
+def test_run_logger_writes_jsonl_with_all_fields():
+    with tempfile.TemporaryDirectory() as tmp:
+        logger = RunLogger(Path(tmp) / "runs")
+        pkg = ContentPackage(
+            topic="Test topic",
+            script="A test script here",
+            title="Test title",
+            description="desc",
+            video_query="nature",
+            tags=["tag1"],
+        )
+        render = RenderResult(
+            video_path=Path(tmp) / "final.mp4",
+            audio_path=Path(tmp) / "voice.mp3",
+            subtitle_path=Path(tmp) / "subs.ass",
+            duration_seconds=30.0,
+        )
+        upload = UploadResult(success=True, video_url="https://yt.be/abc", video_id="abc")
+        record = PublishRecord(
+            channel="biology",
+            package=pkg,
+            render_result=render,
+            upload_result=upload,
+            scheduled_publish_at=None,
+            created_at=datetime.now(timezone.utc),
+        )
+        out = logger.log_publish_record(record)
+        lines = out.read_text().strip().splitlines()
+        assert len(lines) == 1
+        data = _json.loads(lines[0])
+        assert data["channel"] == "biology"
+        assert data["script"] == "A test script here"
+        assert data["video_query"] == "nature"
+        assert "audio_path" in data
+        assert "subtitle_path" in data
+        assert data["upload_success"] is True

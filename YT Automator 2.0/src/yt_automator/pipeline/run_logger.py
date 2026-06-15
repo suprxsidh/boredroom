@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from yt_automator.models import PublishRecord
@@ -13,7 +13,7 @@ class RunLogger:
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
     def log_publish_record(self, record: PublishRecord) -> Path:
-        date_key = datetime.utcnow().strftime("%Y-%m-%d")
+        date_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         output_path = self.data_dir / f"{date_key}.jsonl"
         payload = {
             "channel": record.channel,
@@ -21,9 +21,13 @@ class RunLogger:
             "style_variant": record.package.style_variant,
             "title": record.package.title,
             "description": record.package.description,
+            "script": record.package.script,
+            "video_query": record.package.video_query,
             "tags": record.package.tags,
             "source_links": record.package.source_links,
             "video_path": str(record.render_result.video_path),
+            "audio_path": str(record.render_result.audio_path),
+            "subtitle_path": str(record.render_result.subtitle_path),
             "duration_seconds": record.render_result.duration_seconds,
             "upload_success": record.upload_result.success,
             "video_url": record.upload_result.video_url,

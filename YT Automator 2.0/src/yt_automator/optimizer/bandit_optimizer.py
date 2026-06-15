@@ -28,18 +28,19 @@ class BanditOptimizer:
         if not candidate_arms:
             raise ValueError("No candidate arms available")
         bucket = self.state.setdefault(channel, {})
-        for arm in candidate_arms:
-            bucket.setdefault(arm, {"pulls": 0, "reward_sum": 0.0})
-        if random.random() < epsilon:
-            chosen = random.choice(candidate_arms)
+        new_arms = [arm for arm in candidate_arms if arm not in bucket]
+        for arm in new_arms:
+            bucket[arm] = {"pulls": 0, "reward_sum": 0.0}
+        if new_arms:
             self._save()
-            return chosen
-        chosen = max(
+
+        if random.random() < epsilon:
+            return random.choice(candidate_arms)
+
+        return max(
             candidate_arms,
             key=lambda arm: self._arm_stat(bucket, arm).average_reward,
         )
-        self._save()
-        return chosen
 
     def record_reward(self, channel: str, arm: str, reward: float) -> None:
         bucket = self.state.setdefault(channel, {})
