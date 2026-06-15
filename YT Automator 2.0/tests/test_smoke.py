@@ -198,3 +198,29 @@ def test_write_ass_empty_segments_writes_header_only():
         content = out.read_text()
     assert "[Script Info]" in content
     assert "Dialogue:" not in content
+
+
+# --- Task 7: content generator ---
+from yt_automator.pipeline.content_generator import ContentGenerator
+
+
+def test_content_generator_fallback_returns_package():
+    gen = ContentGenerator(gemini_api_key=None, ollama_model=None)
+    channel_config = {
+        "channel_name": "biology",
+        "prompt_profile": {
+            "system_role": "You are a biology writer.",
+            "script_rules": "Write 30-60 seconds.",
+        },
+    }
+    strategy_data = {"theme": "deep ocean creatures", "default_query": "ocean"}
+    pkg = gen.generate(
+        channel_config=channel_config,
+        strategy_key="deep_ocean",
+        strategy_data=strategy_data,
+        history=[],
+    )
+    assert pkg.topic == "deep ocean creatures"
+    assert len(pkg.script) > 50
+    assert pkg.tags == ["biology", "shorts", "education", "viral"]
+    assert pkg.style_variant == "fallback"
