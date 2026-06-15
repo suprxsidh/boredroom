@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
-import random
+import logging
+import re
 import requests
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 from yt_automator.models import ContentPackage
 from yt_automator.utils.text import normalize_script, sentence_split
@@ -26,7 +29,8 @@ class ContentGenerator:
             try:
                 from google import genai
                 self._client = genai.Client(api_key=gemini_api_key)
-            except Exception:
+            except Exception as exc:
+                _log.warning("google-genai import failed, Gemini disabled: %s", exc)
                 self._client = None
 
     def generate(
@@ -72,8 +76,8 @@ topic, script, title, description, video_query, tags, source_links""".strip()
             try:
                 payload = self._generate_with_ollama(prompt)
                 return self._to_package(payload)
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.warning("Ollama generation failed, trying next backend: %s", exc)
 
         if self._client is not None:
             try:
@@ -83,8 +87,8 @@ topic, script, title, description, video_query, tags, source_links""".strip()
                 )
                 payload = self._parse_json(response.text)
                 return self._to_package(payload)
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.warning("Gemini generation failed, using fallback: %s", exc)
 
         return self._fallback_package(channel_config, strategy_data, reddit_context)
 
@@ -108,7 +112,10 @@ topic, script, title, description, video_query, tags, source_links""".strip()
     @staticmethod
     def _parse_json(text: str) -> dict[str, Any]:
         cleaned = text.strip().replace("```json", "").replace("```", "").strip()
-        return json.loads(cleaned)
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if not match:
+            raise ValueError(f"No JSON object found in LLM response: {cleaned[:200]!r}")
+        return json.loads(match.group())
 
     @staticmethod
     def _to_package(payload: dict[str, Any]) -> ContentPackage:
@@ -132,20 +139,17 @@ topic, script, title, description, video_query, tags, source_links""".strip()
         reddit_context: dict[str, str] | None,
     ) -> ContentPackage:
         topic = strategy_data["theme"]
-        snippets = [
-            "Most people miss this detail, but it changes the whole story.",
-            "This fact sounds fake, yet it is documented.",
-            "Here is where experts completely disagree.",
-        ]
         script = (
             f"Quick deep dive on {topic}. "
             "This starts with a claim almost everyone gets wrong. "
-            f"{random.choice(snippets)} "
+            "Most people miss this crucial detail, but it completely changes the entire story. "
             "The middle of this story is where the explanation gets counterintuitive, "
             "because the obvious answer fails when you look at real evidence. "
+            "Scientists and researchers have documented this for decades, "
+            "yet it rarely makes it into mainstream education or popular discussion. "
             "By the end, one small detail flips the conclusion and makes the whole topic "
-            "easier to remember. "
-            "Follow for the next short if you want more high-signal facts without fluff."
+            "easier to understand and remember. "
+            "Follow for the next short if you want more high-signal facts without the fluff."
         )
         return ContentPackage(
             topic=topic,

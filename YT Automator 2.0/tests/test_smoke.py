@@ -224,3 +224,31 @@ def test_content_generator_fallback_returns_package():
     assert len(pkg.script) > 50
     assert pkg.tags == ["biology", "shorts", "education", "viral"]
     assert pkg.style_variant == "fallback"
+
+
+def test_parse_json_handles_surrounding_prose():
+    gen = ContentGenerator(gemini_api_key=None)
+    # Simulate LLM response with prose wrapping the JSON
+    text = 'Here is the JSON: {"topic": "test", "script": "hello world"} Hope that helps!'
+    result = gen._parse_json(text)
+    assert result["topic"] == "test"
+
+
+def test_fallback_always_passes_qa_gate():
+    from yt_automator.pipeline.qa import QualityGate
+    from yt_automator.utils.text import word_count
+    gate = QualityGate()
+    gen = ContentGenerator(gemini_api_key=None)
+    channel_config = {
+        "channel_name": "biology",
+        "prompt_profile": {
+            "system_role": "You are a biology writer.",
+            "script_rules": "Write 30-60 seconds.",
+        },
+    }
+    # Use shortest possible topic to stress-test word count
+    for topic in ["X", "AI", "deep ocean", "a"]:
+        strategy_data = {"theme": topic, "default_query": "ocean"}
+        pkg = gen._fallback_package(channel_config, strategy_data, None)
+        count = word_count(pkg.script)
+        assert count >= 75, f"Fallback script too short for topic '{topic}': {count} words"
