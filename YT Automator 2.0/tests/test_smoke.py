@@ -153,3 +153,28 @@ def test_wikimedia_blocks_cc_by_nd():
 
 def test_wikimedia_blocks_cc_by_nc():
     assert WikimediaProvider._is_license_allowed("CC BY-NC 4.0") is False
+
+
+# --- Task 6: subtitle format ---
+from yt_automator.pipeline.subtitles import SubtitleEngine
+
+
+def test_write_ass_produces_valid_file():
+    engine = SubtitleEngine()
+    segments = [
+        {"words": [
+            {"word": "Hello", "start": 0.0, "end": 0.5},
+            {"word": "World", "start": 0.5, "end": 1.0},
+        ]}
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "subs.ass"
+        engine.write_ass(segments, out)
+        content = out.read_text()
+    assert "[Script Info]" in content
+    # Style line fields (0-indexed): 18=Alignment
+    style_line = [l for l in content.splitlines() if l.startswith("Style:")][0]
+    fields = style_line.split(",")
+    assert fields[18] == "2", f"Expected Alignment=2 (bottom-center), got {fields[18]}"
+    assert "HELLO" in content
+    assert "WORLD" in content
