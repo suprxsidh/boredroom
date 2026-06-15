@@ -33,13 +33,19 @@ class ConfigLoader:
         path = self.repo_root / "config" / "media_sources.json"
         if not path.exists():
             raise ConfigError(f"Missing media sources config: {path}")
-        return json.loads(path.read_text(encoding="utf-8"))
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ConfigError(f"Invalid JSON in {path}: {exc}") from exc
 
     def load_app_settings(self) -> dict:
         path = self.repo_root / "config" / "app_settings.json"
         if not path.exists():
             raise ConfigError(f"Missing app settings config: {path}")
-        return json.loads(path.read_text(encoding="utf-8"))
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ConfigError(f"Invalid JSON in {path}: {exc}") from exc
 
     def _validate_channel_config(self, channel_name: str, config: dict) -> None:
         required = [
