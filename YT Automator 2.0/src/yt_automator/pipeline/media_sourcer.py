@@ -34,7 +34,9 @@ class MediaSourcer:
         if assets:
             return assets
 
-        fallback_path = output_dir / "local_fallback.jpg"
+        import hashlib
+        query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
+        fallback_path = output_dir / f"local_fallback_{query_hash}.jpg"
         self._create_fallback_image(query, fallback_path)
         return [
             MediaAsset(

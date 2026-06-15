@@ -145,3 +145,11 @@ def test_wikimedia_blocks_all_rights_reserved():
 
 def test_wikimedia_blocks_unknown():
     assert WikimediaProvider._is_license_allowed("Unknown") is False
+
+
+def test_wikimedia_blocks_cc_by_nd():
+    assert WikimediaProvider._is_license_allowed("CC BY-ND 4.0") is False
+
+
+def test_wikimedia_blocks_cc_by_nc():
+    assert WikimediaProvider._is_license_allowed("CC BY-NC 4.0") is False

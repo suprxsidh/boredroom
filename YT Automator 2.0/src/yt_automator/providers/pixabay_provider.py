@@ -26,7 +26,7 @@ class PixabayProvider(MediaProvider):
         params = {
             "key": self.api_key,
             "q": query,
-            "per_page": min(max_assets, 10),
+            "per_page": max(3, min(max_assets, 200)),
             "orientation": "vertical",
             "image_type": "photo",
             "safesearch": "true",

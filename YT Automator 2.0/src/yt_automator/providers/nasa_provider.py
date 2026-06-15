@@ -21,7 +21,7 @@ class NasaProvider(MediaProvider):
         output_dir: Path,
         max_assets: int,
     ) -> list[MediaAsset]:
-        params = {"q": query, "media_type": "image", "page": 1}
+        params = {"q": query, "media_type": "image", "page": 1, "api_key": self.api_key}
         resp = requests.get(
             "https://images-api.nasa.gov/search", params=params, timeout=20
         )
@@ -31,9 +31,10 @@ class NasaProvider(MediaProvider):
         assets: list[MediaAsset] = []
         for idx, item in enumerate(items):
             links = item.get("links") or []
-            if not links:
-                continue
-            image_url = links[0].get("href")
+            image_url = next(
+                (lnk.get("href") for lnk in links if lnk.get("rel") == "preview"),
+                None,
+            )
             if not image_url:
                 continue
             out_path = output_dir / f"nasa_{idx}.jpg"
