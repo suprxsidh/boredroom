@@ -277,3 +277,47 @@ def test_youtube_dry_run_returns_success():
     assert result.success is True
     assert result.video_id == "DRYRUN"
     assert result.video_url == "https://www.youtube.com/watch?v=DRYRUN"
+
+
+# --- Task 10: orchestrator ---
+from yt_automator.pipeline.orchestrator import PipelineOrchestrator
+
+
+def test_orchestrator_list_channels_before_configs():
+    """list_channels returns empty list when config dir has no JSON files."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        (tmp_path / ".yta-root").touch()
+        (tmp_path / "config" / "channels").mkdir(parents=True)
+        (tmp_path / "config").joinpath("app_settings.json").write_text(
+            '{"subtitle_model": "tiny.en", "voices": ["en-US-GuyNeural"]}',
+            encoding="utf-8",
+        )
+        (tmp_path / "config").joinpath("media_sources.json").write_text(
+            '{"providers": []}', encoding="utf-8"
+        )
+        (tmp_path / "data" / "optimizer").mkdir(parents=True)
+        (tmp_path / "data" / "runs").mkdir(parents=True)
+        orch = PipelineOrchestrator(tmp_path)
+        assert orch.list_channels() == []
+
+
+def test_orchestrator_run_doctor_returns_int():
+    """run_doctor returns 0 (no errors) or 1 (errors); never raises."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        (tmp_path / ".yta-root").touch()
+        (tmp_path / "config" / "channels").mkdir(parents=True)
+        (tmp_path / "config").joinpath("app_settings.json").write_text(
+            '{"subtitle_model": "tiny.en", "voices": ["en-US-GuyNeural"]}',
+            encoding="utf-8",
+        )
+        (tmp_path / "config").joinpath("media_sources.json").write_text(
+            '{"providers": []}', encoding="utf-8"
+        )
+        (tmp_path / "data" / "optimizer").mkdir(parents=True)
+        (tmp_path / "data" / "runs").mkdir(parents=True)
+        orch = PipelineOrchestrator(tmp_path)
+        result = orch.run_doctor(strict=False)
+        assert isinstance(result, int)
+        assert result in (0, 1)

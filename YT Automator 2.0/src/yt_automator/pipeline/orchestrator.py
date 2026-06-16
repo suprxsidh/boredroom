@@ -62,7 +62,7 @@ class PipelineOrchestrator:
     def run_doctor(self, strict: bool = False) -> int:
         errors = 0
         warnings = 0
-        _log.info("Running environment checks")
+        print("[INFO] Running environment checks")
 
         for cmd in ("ffmpeg", "ffprobe"):
             if shutil.which(cmd):
@@ -164,73 +164,80 @@ class PipelineOrchestrator:
 
         for index in range(count):
             _log.info("[%s] Generating video %d/%d", channel_name, index + 1, count)
+            try:
+                strategy_key, strategy_data = self._pick_strategy(cfg)
+                package = generator.generate(
+                    channel_config=cfg,
+                    strategy_key=strategy_key,
+                    strategy_data=strategy_data,
+                    history=history,
+                )
+                package.style_variant = strategy_key
 
-            strategy_key, strategy_data = self._pick_strategy(cfg)
-            package = generator.generate(
-                channel_config=cfg,
-                strategy_key=strategy_key,
-                strategy_data=strategy_data,
-                history=history,
-            )
-            package.style_variant = strategy_key
+                valid, issues = qa_gate.validate_content(package)
+                if not valid:
+                    _log.warning("[%s] QA issues: %s", channel_name, issues)
 
-            valid, issues = qa_gate.validate_content(package)
-            if not valid:
-                _log.warning("[%s] QA issues: %s", channel_name, issues)
+                run_dir = self._new_run_dir(channel_name, package.topic)
+                audio_path = run_dir / "voice.mp3"
+                subtitle_path = run_dir / "subs.ass"
+                video_path = run_dir / "final.mp4"
 
-            run_dir = self._new_run_dir(channel_name, package.topic)
-            audio_path = run_dir / "voice.mp3"
-            subtitle_path = run_dir / "subs.ass"
-            video_path = run_dir / "final.mp4"
+                voice = random.choice(voices)
+                run_async(tts.synthesize(package.script, audio_path, voice=voice))
+                segments = subtitle_engine.transcribe_segments(audio_path)
+                subtitle_engine.write_ass(segments, subtitle_path)
 
-            voice = random.choice(voices)
-            run_async(tts.synthesize(package.script, audio_path, voice=voice))
-            segments = subtitle_engine.transcribe_segments(audio_path)
-            subtitle_engine.write_ass(segments, subtitle_path)
+                assets = media_sourcer.fetch_assets(
+                    package.video_query,
+                    run_dir / "assets",
+                    max_assets=cfg["pipeline"]["assets_per_video"],
+                )
 
-            assets = media_sourcer.fetch_assets(
-                package.video_query,
-                run_dir / "assets",
-                max_assets=cfg["pipeline"]["assets_per_video"],
-            )
+                music_path = self._resolve_music_file(cfg)
+                render_result = renderer.render(
+                    assets=assets,
+                    voice_audio_path=audio_path,
+                    subtitle_path=subtitle_path,
+                    music_path=music_path,
+                    output_path=video_path,
+                )
 
-            music_path = self._resolve_music_file(cfg)
-            render_result = renderer.render(
-                assets=assets,
-                voice_audio_path=audio_path,
-                subtitle_path=subtitle_path,
-                music_path=music_path,
-                output_path=video_path,
-            )
+                publish_at = schedule_times[index] if schedule and index < len(schedule_times) else None
+                upload_result = youtube_client.upload_short(
+                    video_path=render_result.video_path,
+                    title=package.title,
+                    description=package.description,
+                    tags=package.tags,
+                    category_id=cfg["youtube"]["category_id"],
+                    privacy_status=cfg["youtube"]["privacy_status"],
+                    publish_at=publish_at,
+                    dry_run=dry_run,
+                )
 
-            publish_at = schedule_times[index] if schedule and index < len(schedule_times) else None
-            upload_result = youtube_client.upload_short(
-                video_path=render_result.video_path,
-                title=package.title,
-                description=package.description,
-                tags=package.tags,
-                category_id=cfg["youtube"]["category_id"],
-                privacy_status=cfg["youtube"]["privacy_status"],
-                publish_at=publish_at,
-                dry_run=dry_run,
-            )
+                record = PublishRecord(
+                    channel=channel_name,
+                    package=package,
+                    render_result=render_result,
+                    upload_result=upload_result,
+                    scheduled_publish_at=publish_at,
+                    created_at=datetime.now(timezone.utc),
+                )
+                self.logger.log_publish_record(record)
 
-            record = PublishRecord(
-                channel=channel_name,
-                package=package,
-                render_result=render_result,
-                upload_result=upload_result,
-                scheduled_publish_at=publish_at,
-                created_at=datetime.now(timezone.utc),
-            )
-            self.logger.log_publish_record(record)
-
-            if upload_result.success:
-                _log.info("[%s] Uploaded: %s", channel_name, upload_result.video_url)
-                self._append_topic_history(cfg, package.topic)
-                history.append(package.topic)
-            else:
-                _log.error("[%s] Upload failed: %s", channel_name, upload_result.error)
+                if upload_result.success:
+                    _log.info("[%s] Uploaded: %s", channel_name, upload_result.video_url)
+                    self._append_topic_history(cfg, package.topic)
+                    history.append(package.topic)
+                else:
+                    _log.error("[%s] Upload failed: %s", channel_name, upload_result.error)
+            except Exception as exc:
+                _log.error(
+                    "[%s] Video %d/%d failed, skipping: %s",
+                    channel_name, index + 1, count, exc,
+                    exc_info=True,
+                )
+                continue
 
     def record_manual_reward(self, channel: str, arm: str, reward: float) -> None:
         self.optimizer.record_reward(channel, arm, reward)
@@ -249,7 +256,7 @@ class PipelineOrchestrator:
             if not provider_cfg.get("enabled", False):
                 continue
             channels = provider_cfg.get("channels")
-            if channels and channel_name not in channels:
+            if channels and channel_name.lower() not in [c.lower() for c in channels]:
                 continue
             name = provider_cfg.get("name")
             if name == "pixabay":
@@ -273,18 +280,31 @@ class PipelineOrchestrator:
             fallback = self.repo_root / "assets" / "music" / "fallback_silent.mp3"
             fallback.parent.mkdir(parents=True, exist_ok=True)
             if not fallback.exists():
-                subprocess.run(
-                    [
-                        "ffmpeg", "-y", "-f", "lavfi",
-                        "-i", "anullsrc=r=44100:cl=mono",
-                        "-t", "8", "-q:a", "9", "-acodec", "libmp3lame",
-                        str(fallback),
-                    ],
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            candidates.append(fallback)
+                try:
+                    subprocess.run(
+                        [
+                            "ffmpeg", "-y", "-f", "lavfi",
+                            "-i", "anullsrc=r=44100:cl=mono",
+                            "-t", "8", "-q:a", "9", "-acodec", "libmp3lame",
+                            str(fallback),
+                        ],
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    candidates.append(fallback)
+                except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+                    _log.warning(
+                        "Could not generate silent fallback MP3 (%s); run 'brew install ffmpeg'",
+                        exc,
+                    )
+            else:
+                candidates.append(fallback)
+        if not candidates:
+            raise RuntimeError(
+                "No music files found and could not create silent fallback. "
+                "Place MP3 files in assets/music/ or install ffmpeg."
+            )
         return random.choice(candidates)
 
     def _resolve_youtube_paths(self, cfg: dict) -> tuple[Path, Path]:
