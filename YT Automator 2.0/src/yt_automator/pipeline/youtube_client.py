@@ -16,6 +16,7 @@ from yt_automator.models import UploadResult
 _log = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+UPLOAD_PARTS = "snippet,status"
 
 
 class YouTubeClient:
@@ -45,6 +46,7 @@ class YouTubeClient:
                 creds = flow.run_local_server(port=0)
             self.token_path.parent.mkdir(parents=True, exist_ok=True)
             self.token_path.write_text(creds.to_json(), encoding="utf-8")
+            self.token_path.chmod(0o600)
         self.service = build("youtube", "v3", credentials=creds)
         return True
 
@@ -93,10 +95,10 @@ class YouTubeClient:
             body["status"]["publishAt"] = publish_at
 
         media = MediaFileUpload(
-            str(video_path), chunksize=-1, resumable=True, mimetype="video/mp4"
+            str(video_path), chunksize=2 * 1024 * 1024, resumable=True, mimetype="video/mp4"
         )
         request = self.service.videos().insert(
-            part=",".join(body.keys()), body=body, media_body=media
+            part=UPLOAD_PARTS, body=body, media_body=media
         )
 
         for attempt in range(3):
@@ -106,7 +108,12 @@ class YouTubeClient:
                     status, response = request.next_chunk()
                     if status:
                         _log.info("Upload progress: %d%%", int(status.progress() * 100))
-                video_id = response["id"]
+                video_id = response.get("id")
+                if not video_id:
+                    return UploadResult(
+                        success=False, video_url=None, video_id=None,
+                        error="YouTube API returned success but no video ID",
+                    )
                 return UploadResult(
                     success=True,
                     video_url=f"https://www.youtube.com/watch?v={video_id}",
@@ -119,8 +126,9 @@ class YouTubeClient:
                 return UploadResult(
                     success=False, video_url=None, video_id=None, error=str(exc)
                 )
-            except Exception as exc:
+            except (OSError, ConnectionError, TimeoutError) as exc:
                 if attempt < 2:
+                    _log.warning("Upload connection error (attempt %d/3): %s", attempt + 1, exc)
                     time.sleep(3)
                     continue
                 return UploadResult(
