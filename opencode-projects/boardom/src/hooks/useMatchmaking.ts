@@ -25,8 +25,8 @@ interface UseMatchmakingOptions {
 
 export function useMatchmaking({ onSignal, onMatched }: UseMatchmakingOptions) {
   const [status, setStatus] = useState<MatchmakingStatus>('idle')
+  const [userId, setUserId] = useState('')
   const channelRef = useRef<RealtimeChannel | null>(null)
-  const userIdRef = useRef('')
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const matchedRef = useRef(false)
 
@@ -45,13 +45,13 @@ export function useMatchmaking({ onSignal, onMatched }: UseMatchmakingOptions) {
   }, [])
 
   const start = useCallback(() => {
-    const userId = crypto.randomUUID()
-    userIdRef.current = userId
+    const newUserId = crypto.randomUUID()
+    setUserId(newUserId)
     matchedRef.current = false
     setStatus('waiting')
 
     const channel = supabase.channel('lobby', {
-      config: { presence: { key: userId } },
+      config: { presence: { key: newUserId } },
     })
 
     channel
@@ -69,11 +69,11 @@ export function useMatchmaking({ onSignal, onMatched }: UseMatchmakingOptions) {
         )
 
         // Find this user's entry
-        const me = users.find((u) => u.userId === userId)
+        const me = users.find((u) => u.userId === newUserId)
         if (!me) return
 
         // Find a peer (any other user)
-        const peer = users.find((u) => u.userId !== userId)
+        const peer = users.find((u) => u.userId !== newUserId)
         if (!peer) return
 
         matchedRef.current = true
@@ -90,11 +90,11 @@ export function useMatchmaking({ onSignal, onMatched }: UseMatchmakingOptions) {
         channelRef.current = null
       })
       .on('broadcast', { event: 'signal' }, ({ payload }: { payload: SignalingMessage }) => {
-        if (payload.to === userId) onSignalRef.current(payload)
+        if (payload.to === newUserId) onSignalRef.current(payload)
       })
       .subscribe(async (s) => {
         if (s === 'SUBSCRIBED') {
-          await channel.track({ userId, joinedAt: Date.now() })
+          await channel.track({ userId: newUserId, joinedAt: Date.now() })
         }
       })
 
@@ -103,11 +103,12 @@ export function useMatchmaking({ onSignal, onMatched }: UseMatchmakingOptions) {
     timeoutRef.current = setTimeout(() => {
       if (!matchedRef.current) {
         setStatus('timeout')
+        timeoutRef.current = null
         channel.unsubscribe()
         channelRef.current = null
       }
     }, 60_000)
-  }, [cancel])
+  }, [])
 
   const sendSignal = useCallback((msg: SignalingMessage) => {
     channelRef.current?.send({ type: 'broadcast', event: 'signal', payload: msg })
@@ -120,5 +121,5 @@ export function useMatchmaking({ onSignal, onMatched }: UseMatchmakingOptions) {
     }
   }, [])
 
-  return { status, userId: userIdRef.current, start, cancel, sendSignal }
+  return { status, userId, start, cancel, sendSignal }
 }

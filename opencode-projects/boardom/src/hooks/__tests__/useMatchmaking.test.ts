@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useMatchmaking } from '@/hooks/useMatchmaking'
 
@@ -136,6 +136,31 @@ describe('useMatchmaking', () => {
       type: 'broadcast',
       event: 'signal',
       payload: msg,
+    })
+  })
+
+  describe('timeout', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('sets status to timeout after 60 seconds with no match', async () => {
+      const { result } = renderHook(() =>
+        useMatchmaking({ onSignal: vi.fn(), onMatched: vi.fn() })
+      )
+
+      await act(async () => { result.current.start() })
+      expect(result.current.status).toBe('waiting')
+
+      await act(async () => {
+        vi.advanceTimersByTime(60_000)
+      })
+
+      expect(result.current.status).toBe('timeout')
     })
   })
 })
