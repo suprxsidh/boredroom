@@ -27,7 +27,6 @@ export function usePeerConnection({
     peer.on('connect', onConnect)
     peer.on('data', (buf) => onData(buf.toString()))
     peer.on('close', onClose)
-    peer.on('error', onClose)
 
     peerRef.current = peer
 
