@@ -3,7 +3,7 @@
 import { Editor, DefaultColorStyle, DefaultSizeStyle } from 'tldraw'
 
 type TldrawColor = 'black' | 'white' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'violet'
-type TldrawSize = 's' | 'm' | 'l' | 'xl'
+type TldrawSize = 's' | 'm' | 'l'
 
 const COLORS: { token: TldrawColor; hex: string }[] = [
   { token: 'black', hex: '#1d1d1d' },
