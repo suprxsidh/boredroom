@@ -22,10 +22,12 @@ describe('StickerPanel', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('shows Notes tab by default', () => {
+  it('shows Notes tab with 3 color options by default', () => {
     const editor = makeEditor()
     render(<StickerPanel editor={editor as any} />)
-    expect(screen.getByTitle('Add sticky note')).toBeInTheDocument()
+    expect(screen.getByTitle('Yellow note')).toBeInTheDocument()
+    expect(screen.getByTitle('Blue note')).toBeInTheDocument()
+    expect(screen.getByTitle('Green note')).toBeInTheDocument()
   })
 
   it('switches to Emoji tab on click', () => {
@@ -35,12 +37,12 @@ describe('StickerPanel', () => {
     expect(screen.getByTitle('🔥')).toBeInTheDocument()
   })
 
-  it('places a note shape when + button clicked', () => {
+  it('places a yellow note shape when yellow + button clicked', () => {
     const editor = makeEditor()
     render(<StickerPanel editor={editor as any} />)
-    fireEvent.click(screen.getByTitle('Add sticky note'))
+    fireEvent.click(screen.getByTitle('Yellow note'))
     expect(editor.createShape).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'note', x: 0, y: 100 })
+      expect.objectContaining({ type: 'note', x: 0, y: 100, props: { color: 'yellow' } })
     )
     expect(editor.select).toHaveBeenCalledWith('shape:test-id')
   })

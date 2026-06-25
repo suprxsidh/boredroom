@@ -19,7 +19,7 @@ export default function StickerPanel({ editor }: Props) {
 
   if (!editor) return null
 
-  function placeNote() {
+  function placeNote(color: string) {
     const id = createShapeId()
     const { x, y } = editor!.getViewportPageBounds().center
     editor!.createShape({
@@ -27,6 +27,7 @@ export default function StickerPanel({ editor }: Props) {
       type: 'note',
       x: x - 100,
       y: y - 100,
+      props: { color },
     })
     editor!.select(id)
   }
@@ -59,9 +60,23 @@ export default function StickerPanel({ editor }: Props) {
       {tab === 'notes' && (
         <div className="flex flex-col items-center gap-2 px-1">
           <button
-            onClick={placeNote}
+            onClick={() => placeNote('yellow')}
             className="w-12 h-12 bg-yellow-200 rounded-md text-xs text-neutral-600 hover:bg-yellow-300 transition-colors flex items-center justify-center"
-            title="Add sticky note"
+            title="Yellow note"
+          >
+            +
+          </button>
+          <button
+            onClick={() => placeNote('blue')}
+            className="w-12 h-12 bg-blue-200 rounded-md text-xs text-neutral-600 hover:bg-blue-300 transition-colors flex items-center justify-center"
+            title="Blue note"
+          >
+            +
+          </button>
+          <button
+            onClick={() => placeNote('green')}
+            className="w-12 h-12 bg-green-200 rounded-md text-xs text-neutral-600 hover:bg-green-300 transition-colors flex items-center justify-center"
+            title="Green note"
           >
             +
           </button>
