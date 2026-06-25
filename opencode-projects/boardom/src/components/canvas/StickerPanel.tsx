@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Editor, createShapeId } from 'tldraw'
+import { Editor, createShapeId, TLDefaultColorStyle } from 'tldraw'
+import { toRichText } from '@tldraw/tlschema'
 
 const EMOJI_LIST = [
   '😂', '❤️', '🔥', '👍', '👎', '😮', '😢', '🎉',
@@ -19,7 +20,7 @@ export default function StickerPanel({ editor }: Props) {
 
   if (!editor) return null
 
-  function placeNote(color: string) {
+  function placeNote(color: TLDefaultColorStyle) {
     const id = createShapeId()
     const { x, y } = editor!.getViewportPageBounds().center
     editor!.createShape({
@@ -40,7 +41,7 @@ export default function StickerPanel({ editor }: Props) {
       type: 'text',
       x,
       y,
-      props: { text: emoji, size: 'xl', font: 'sans' },
+      props: { richText: toRichText(emoji), size: 'xl', font: 'sans' },
     })
     editor!.select(id)
   }
@@ -60,21 +61,21 @@ export default function StickerPanel({ editor }: Props) {
       {tab === 'notes' && (
         <div className="flex flex-col items-center gap-2 px-1">
           <button
-            onClick={() => placeNote('yellow')}
+            onClick={() => placeNote('yellow' as TLDefaultColorStyle)}
             className="w-12 h-12 bg-yellow-200 rounded-md text-xs text-neutral-600 hover:bg-yellow-300 transition-colors flex items-center justify-center"
             title="Yellow note"
           >
             +
           </button>
           <button
-            onClick={() => placeNote('blue')}
+            onClick={() => placeNote('blue' as TLDefaultColorStyle)}
             className="w-12 h-12 bg-blue-200 rounded-md text-xs text-neutral-600 hover:bg-blue-300 transition-colors flex items-center justify-center"
             title="Blue note"
           >
             +
           </button>
           <button
-            onClick={() => placeNote('green')}
+            onClick={() => placeNote('green' as TLDefaultColorStyle)}
             className="w-12 h-12 bg-green-200 rounded-md text-xs text-neutral-600 hover:bg-green-300 transition-colors flex items-center justify-center"
             title="Green note"
           >

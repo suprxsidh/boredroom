@@ -68,7 +68,7 @@ export function useCanvasSync({ editor, sendData, remoteUserId }: UseCanvasSyncO
       editor.store.mergeRemoteChanges(() => {
         if (msg.added.length) editor.store.put(msg.added)
         if (msg.updated.length) editor.store.put(msg.updated)
-        if (msg.removed.length) editor.store.remove(msg.removed)
+        if (msg.removed.length) editor.store.remove(msg.removed as TLRecord['id'][])
       })
     } else if (msg.type === 'cursor') {
       const presence: TLInstancePresence = InstancePresenceRecordType.create({
@@ -83,7 +83,6 @@ export function useCanvasSync({ editor, sendData, remoteUserId }: UseCanvasSyncO
         followingUserId: null,
         screenBounds: { x: 0, y: 0, w: 0, h: 0 },
         selectedShapeIds: [],
-        trackingNumber: 0,
       })
 
       editor.store.mergeRemoteChanges(() => {
